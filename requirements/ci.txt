@@ -1,5 +1,6 @@
 setuptools-git==1.2
 mypy==0.600; implementation_name=="cpython"
+pytest-xdist==1.22.2
 
 -r doc.txt
 -r ci-wheel.txt
