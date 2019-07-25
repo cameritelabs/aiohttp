@@ -111,7 +111,7 @@ tests_require = [
 
 
 args = dict(
-    name='aiohttp',
+    name='aiohttp-camerite',
     version=version,
     description='Async http client/server framework (asyncio)',
     long_description='\n\n'.join((read('README.rst'), read('CHANGES.rst'))),
