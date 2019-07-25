@@ -9,6 +9,7 @@ alives
 api
 api’s
 app
+apps
 app’s
 arg
 Arsenic
@@ -30,6 +31,7 @@ BaseEventLoop
 basename
 BasicAuth
 BodyPartReader
+boolean
 botocore
 Bugfixes
 builtin
@@ -113,6 +115,7 @@ impl
 incapsulates
 Indices
 infos
+initializer
 inline
 intaking
 io
@@ -148,6 +151,7 @@ middlewares
 miltidict
 misbehaviors
 misformed
+Mixcloud
 Mongo
 msg
 MsgType
@@ -265,11 +269,13 @@ Tf
 timestamps
 toolbar
 toplevel
+towncrier
 tp
 tuples
 UI
 un
 unawaited
+unclosed
 unicode
 unittest
 Unittest
@@ -301,3 +307,4 @@ WSMsgType
 wss
 www
 xxx
+yarl

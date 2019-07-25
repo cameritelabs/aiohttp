@@ -297,6 +297,8 @@ functionality, the AioHTTPTestCase is provided::
 
        The event loop in which the application and server are running.
 
+       .. deprecated:: 3.5
+
     .. attribute:: app
 
        The application returned by :meth:`get_app`
@@ -483,7 +485,7 @@ High level test creation::
     from aiohttp import request
 
     # loop_context is provided as a utility. You can use any
-    # asyncio.BaseEventLoop class in it's place.
+    # asyncio.BaseEventLoop class in its place.
     with loop_context() as loop:
         app = _create_example_app()
         with TestClient(TestServer(app), loop=loop) as client:
@@ -715,7 +717,7 @@ Test Client
       Routes a request to tested http server.
 
       The interface is identical to
-      :meth:`asyncio.ClientSession.request`, except the loop kwarg is
+      :meth:`aiohttp.ClientSession.request`, except the loop kwarg is
       overridden by the instance used by the test server.
 
    .. comethod:: get(path, *args, **kwargs)

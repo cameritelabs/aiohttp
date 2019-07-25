@@ -1,23 +1,26 @@
+conditions: v1
 version: "= 0"
+if: >  # Forbid running non-PR pushes from pyup bot
+  not (type != pull_request AND branch =~ ^pyup\-scheduled\-update\-)
 
-sudo: false
+dist: xenial
+sudo: required
 
 language: python
 
 python:
 - 3.5
-- &mainstream_python 3.6
-- 3.6-dev
+- 3.6
+- &mainstream_python 3.7
 - nightly
-- &pypy3 pypy3.5
+- &pypy3 pypy3.5-6.0.0
 
 install:
-- &upgrade_python_toolset pip install --upgrade pip wheel setuptools
+- &upgrade_python_toolset pip install --upgrade 'pip<19' wheel setuptools
+- pip install -r requirements/cython.txt
 - pip install -r requirements/ci.txt
 
 script:
-- make cov-ci-no-ext
-- make cov-ci-aio-debug
 - make cov-ci-run
 
 after_success:
@@ -43,7 +46,7 @@ _helpers:
   <<: *_lint_base
   install:
   - *upgrade_python_toolset
-  - pip install -U -r requirements/ci.txt -r requirements/doc.txt -r requirements/doc-spelling.txt
+  - pip install -U -r requirements/doc.txt -r requirements/doc-spelling.txt
   after_failure: cat docs/_build/spelling/output.txt
   addons:
     apt:
@@ -55,7 +58,7 @@ _helpers:
   language: generic
   python: *pypy3
   env:
-  - &env_pypy3 PYTHON_VERSION=pypy3.5-5.10.0
+  - &env_pypy3 PYTHON_VERSION=pypy3.6-7.1.1
   - &env_pyenv PYENV_ROOT="$HOME/.pyenv"
   - &env_path PATH="$PYENV_ROOT/bin:$PATH"
   before_install:
@@ -77,9 +80,15 @@ _helpers:
     # `skip_cleanup: true` is required to preserve binary wheels, built
     # inside of manylinux1 docker container during `script` step above.
     skip_cleanup: true
-    user: andrew.svetlov
+    # `skip-existing: true` is required to skip uploading dists, already
+    # present in PYPI instead of failing the whole process.
+    # This happens when other CI (AppVeyor etc.) has already uploaded
+    # the very same dist (usually sdist).
+    skip-existing: true
+    user: aio-libs-bot
     password:
-      secure: ZQKbdPT9BlNqP5CTbWRQyeyig7Bpf7wsnYVQIQPOZc9Ec74A+dsbagstR1sPkAO+d+5PN0pZMovvmU7OQhSVPAnJ74nsN90/fL4ux3kqYecMbevv0rJg20hMXSSkwMEIpjUsMdMjJvZAcaKytGWmKL0qAlOJHhixd1pBbWyuIUE=
+      # Encrypted with `travis encrypt -r aio-libs/aiohttp --api-endpoint 'https://api.travis-ci.com/'`:
+      secure: bWF8GkGmjxfisMx+LqOmZgf9EXPT4yBMhiIbN+rU5gs53PJJyn1r287c5zEijnIHlpQaJVwWJ9ZFl1n34y37P1yvhlz0M6esr5K10B9fJ6nkUoAivtOWARcHLQ3bC+WGC/V9S0v0pZ11qFuSNzJzFZqfRabRw0H8muVWGhuBuYp97EdJWCdSNpXqsj2Ts8ytPMYv+5m3iPgXq833svFbWRjZ+HgX8HwvF2lo+ej+tsFJNACbQmj+eQDGlWQZzP2s4/3grHivd2retpqfW1cYgZaZX68/UB2ghsCtkxhcNpGaM8I/n3udAHkPSqz3MC2FJL0RdkyvQ8UZkcmcisQxz0voQM25995BHGWktwpDh7BxFtGJishXV7hiFz9zVOZLM9u5AzIO4hoN770SsZDewWdhzowXPYT8DXiHVg+roEkszg8FeBmisx1cw34CK9H0iLUSQ9EF2vuz8T4bqEpbT6Fyta90wZTvJ7GpJ4yXJXR6VAvLgiX4zXeFdx/4aViz3UzkDJ06qieRuZJWfQ9u2lDxJfqHEVy5IxM5iACagP1XayJiVIN0uFRxNElxTlCMope6ICCOu9fhcGnF15XNw5YpFPYYvph3JU1vC8cYw7ypg8LQGryp1fNM9SXWaGTiV+J/yvsynFiXX6QiyGOwSBIJ9XjZEfRd8i9HaGHw2cw=
     # Although Travis CI instructs `setup.py` to build source distribution,
     # which is default value for distribution option (`distribution: sdist`),
     # it will also upload all wheels we've previously built in manylinux1
@@ -99,7 +108,7 @@ _helpers:
   script: skip
   after_success: []
   env:
-  - &env_os1011_msg Build and deploy to PYPI of OS X 10.11 binary wheel
+  - &env_os1011_msg Build and deploy to PYPI of OS X 10.11 binary wheel=
   - &env_py36 PYTHON_VERSION=3.6.3
   - *env_pyenv
   - *env_path
@@ -111,7 +120,7 @@ _helpers:
   <<: *osx_pypi_deploy_base_1011
   osx_image: xcode8.1
   env:
-  - &env_os1012_msg Build and deploy to PYPI of OS X 10.12 binary wheel
+  - &env_os1012_msg Build and deploy to PYPI of OS X 10.12 binary wheel=
   - *env_py36
   - *env_pyenv
   - *env_path
@@ -119,7 +128,7 @@ _helpers:
   <<: *osx_pypi_deploy_base_1011
   osx_image: xcode6.4
   env:
-  - &env_os1010_msg Build and deploy to PYPI of OS X 10.10 binary wheel
+  - &env_os1010_msg Build and deploy to PYPI of OS X 10.10 binary wheel=
   - *env_py36
   - *env_pyenv
   - *env_path
@@ -130,35 +139,62 @@ jobs:
   fast_finish: true
   allow_failures:
   - python: nightly
-  - python: *pypy3
 
   include:
-  - <<: *_doc_base
+  - name: 3.7 without extensions
+    python: 3.7
     env:
-    - TARGET=docs
+      AIOHTTP_NO_EXTENSIONS: 1
+
+  - <<: *_doc_base
+    name: Checking docs spelling
     script:
     - make doc-spelling
 
   - <<: *_doc_base
-    env:
-    - TARGET=towncrier
+    name: Checking Towncrier fragments
+    install:
+    - *upgrade_python_toolset
+    - pip install -r requirements/cython.txt
+    - pip install -r requirements/ci.txt
+    - pip install -r requirements/towncrier.txt
     script:
     - towncrier --yes
 
   - <<: *_lint_base
-    env:
-    - TARGET=flake8
+    name: Linting source code with flake8
+    install:
+    - *upgrade_python_toolset
+    - pip install -r requirements/flake.txt
     script:
     - flake8 aiohttp examples tests
 
   - <<: *_lint_base
-    env:
-    - TARGET="dist setup check"
+    name: Linting source code with mypy
     install:
     - *upgrade_python_toolset
-    - pip install -r requirements/doc.txt
+    - pip install -r requirements/cython.txt
+    - pip install -r requirements/ci.txt
     script:
-    - python setup.py check --metadata --restructuredtext --strict --verbose
+    - mypy aiohttp
+
+  - <<: *_lint_base
+    name: Verifying distribution package metadata
+    install:
+    - *upgrade_python_toolset
+    - pip install -r requirements/cython.txt
+    - pip install -r requirements/ci.txt -r requirements/doc.txt
+    script:
+    - python setup.py check --metadata --restructuredtext --strict --verbose sdist bdist_wheel
+    - twine check dist/*
+
+  - <<: *_lint_base
+    name: Making sure that CONTRIBUTORS.txt remains sorted
+    language: minimal
+    install:
+    - skip
+    script:
+    - LC_ALL=C sort -c CONTRIBUTORS.txt
 
   - <<: *osx_python_base
     python: 3.5.3
@@ -179,9 +215,9 @@ jobs:
     - *env_pyenv
     - *env_path
   - <<: *osx_python_base
-    python: nightly
+    python: 3.7
     env:
-    - PYTHON_VERSION=3.7-dev
+    - &env_py37 PYTHON_VERSION=3.7.0
     - *env_pyenv
     - *env_path
   # pypy3.5-5.10.0 fails under OS X because it's unsupported
@@ -190,33 +226,14 @@ jobs:
   - <<: *generic_deploy_base
     <<: *_reset_steps
     env: Build and deploy to PYPI of manylinux1 binary wheels for all supported Pythons and source distribution=
-    dist: trusty
-    group: edge
     services:
     - docker
     script:
     - ./tools/run_docker.sh "aiohttp"
+    - pip install -r requirements/cython.txt
     - pip install -r requirements/ci.txt  # to compile *.c files by Cython
     deploy:
-      provider: pypi
-      # `skip_cleanup: true` is required to preserve binary wheels, built
-      # inside of manylinux1 docker container during `script` step above.
-      skip_cleanup: true
-      user: andrew.svetlov
-      password:
-        secure: "Fn5RaVoU66e7609jKgJ8yMYyuxvPj+4lmg6cFh6hEv7dyp6UbHXxBUJKAeU3VS2I0L/IrC73Z/389J4B8aYcQAlk25WbN6TTtUa1d6Uu/4MZISdvNYtvFotqwcZR47ZcfA8n3IHjZezJbbAWy0flDLGR+3tDVSHP/E5r5GgB3Ok="
-      # Although Travis CI instructs `setup.py` to build source distribution,
-      # which is default value for distribution option (`distribution: sdist`),
-      # it will also upload all wheels we've previously built in manylinux1
-      # docker container using `twine upload -r pypi dist/*` command.
-      # Also since commit https://github.com/travis-ci/dpl/commit/90b5e39
-      # it is default that Travis PYPI provider has `skip_upload_docs: true`
-      # set by default.
-      # Besides above, we don't do cleanup of `dist/*`, because it's being done
-      # by Travis CI PYPI deployment provider after upload, unconditionally.
-      on:
-        tags: true
-        all_branches: true
+      <<: *deploy_step
 
     # Build and deploy MacOS binary wheels for each OSX+Python combo possible
     # OS X 10.10, Python 3.5
@@ -234,6 +251,13 @@ jobs:
     - *env_py36
     - *env_pyenv
     - *env_path
+    # OS X 10.10, Python 3.7
+  - <<: *osx_pypi_deploy_base_1010
+    env:
+    - *env_os1010_msg
+    - *env_py37
+    - *env_pyenv
+    - *env_path
     # OS X 10.11, Python 3.5
   - <<: *osx_pypi_deploy_base_1011
     python: 3.5
@@ -249,6 +273,13 @@ jobs:
     - *env_py36
     - *env_pyenv
     - *env_path
+    # OS X 10.11, Python 3.7
+  - <<: *osx_pypi_deploy_base_1011
+    env:
+    - *env_os1011_msg
+    - *env_py37
+    - *env_pyenv
+    - *env_path
     # OS X 10.12, Python 3.5
   - <<: *osx_pypi_deploy_base_1012
     python: 3.5
@@ -262,6 +293,13 @@ jobs:
     env:
     - *env_os1012_msg
     - *env_py36
+    - *env_pyenv
+    - *env_path
+    # OS X 10.12, Python 3.7
+  - <<: *osx_pypi_deploy_base_1012
+    env:
+    - *env_os1012_msg
+    - *env_py37
     - *env_pyenv
     - *env_path
 

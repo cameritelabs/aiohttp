@@ -71,8 +71,6 @@ and :ref:`aiohttp-web-signals` handlers.
 
       The value could be overridden by :meth:`~BaseRequest.clone`.
 
-      ``'http'`` otherwise.
-
       Read-only :class:`str` property.
 
       .. versionchanged:: 2.3
@@ -227,7 +225,7 @@ and :ref:`aiohttp-web-signals` handlers.
 
       Read-only :class:`asyncio.AbstractEventLoop` property.
 
-      .. versionadded:: 2.3
+      .. deprecated:: 3.5
 
    .. attribute:: cookies
 
@@ -411,7 +409,7 @@ and :ref:`aiohttp-web-signals` handlers.
          :meth:`~Request.json` call will return the same value.
 
 
-   .. comethod:: multipart(*, reader=aiohttp.multipart.MultipartReader)
+   .. comethod:: multipart()
 
       Returns :class:`aiohttp.multipart.MultipartReader` which processes
       incoming *multipart* request.
@@ -431,6 +429,10 @@ and :ref:`aiohttp-web-signals` handlers.
          more time.
 
       .. seealso:: :ref:`aiohttp-multipart`
+
+      .. versionchanged:: 3.4
+
+         Dropped *reader* parameter.
 
    .. comethod:: post()
 
@@ -465,7 +467,7 @@ and :ref:`aiohttp-web-signals` handlers.
 
 .. class:: Request
 
-   An request used for receiving request's information by *web handler*.
+   A request used for receiving request's information by *web handler*.
 
    Every :ref:`handler<aiohttp-web-handler>` accepts a request
    instance as the first positional parameter.
@@ -803,7 +805,8 @@ Response
 ^^^^^^^^
 
 .. class:: Response(*, body=None, status=200, reason=None, text=None, \
-   headers=None, content_type=None, charset=None)
+                    headers=None, content_type=None, charset=None, \
+                    zlib_executor_size=sentinel, zlib_executor=None)
 
    The most usable response class, inherited from :class:`StreamResponse`.
 
@@ -828,6 +831,15 @@ Response
    :param str charset: response's charset. ``'utf-8'`` if *text* is
                        passed also, ``None`` otherwise.
 
+   :param int zlib_executor_size: length in bytes which will trigger zlib compression
+                            of body to happen in an executor
+
+      .. versionadded:: 3.5
+
+   :param int zlib_executor: executor to use for zlib compression
+
+      .. versionadded:: 3.5
+
 
    .. attribute:: body
 
@@ -836,6 +848,11 @@ Response
 
       Setting :attr:`body` also recalculates
       :attr:`~StreamResponse.content_length` value.
+
+      Assigning :class:`str` to :attr:`body` will make the :attr:`body`
+      type of :class:`aiohttp.payload.StringPayload`, which tries to encode
+      the given data based on *Content-Type* HTTP header, while defaulting
+      to ``UTF-8``.
 
       Resetting :attr:`body` (assigning ``None``) sets
       :attr:`~StreamResponse.content_length` to ``None`` too, dropping
@@ -860,7 +877,7 @@ WebSocketResponse
 
 .. class:: WebSocketResponse(*, timeout=10.0, receive_timeout=None, \
                              autoclose=True, autoping=True, heartbeat=None, \
-                             protocols=(), compress=True)
+                             protocols=(), compress=True, max_msg_size=4194304)
 
    Class for handling server-side websockets, inherited from
    :class:`StreamResponse`.
@@ -897,6 +914,12 @@ WebSocketResponse
 
    :param bool compress: Enable per-message deflate extension support.
                           False for disabled, default value is True.
+
+   :param int max_msg_size: maximum size of read websocket message, 4
+                            MB by default. To disable the size limit use ``0``.
+
+      .. versionadded:: 3.3
+
 
    The class supports ``async for`` statement for iterating over
    incoming messages::
@@ -1184,7 +1207,7 @@ WebSocketReady
 
 
 json_response
--------------
+^^^^^^^^^^^^^
 
 .. function:: json_response([data], *, text=None, body=None, \
                             status=200, reason=None, headers=None, \
@@ -1208,10 +1231,8 @@ Application
 Application is a synonym for web-server.
 
 To get fully working example, you have to make *application*, register
-supported urls in *router* and create a *server socket* with
-:class:`~aiohttp.web.Server` as a *protocol
-factory*. *Server* could be constructed with
-:meth:`Application.make_handler`.
+supported urls in *router* and pass it to :func:`aiohttp.web.run_app`
+or :class:`aiohttp.web.AppRunner`.
 
 *Application* contains a *router* instance and a list of callbacks that
 will be called during application finishing.
@@ -1231,7 +1252,7 @@ properties for later access from a :ref:`handler<aiohttp-web-handler>` via the
 Although :class:`Application` is a :obj:`dict`-like object, it can't be
 duplicated like one using :meth:`Application.copy`.
 
-.. class:: Application(*, logger=<default>, router=None,middlewares=(), \
+.. class:: Application(*, logger=<default>, middlewares=(), \
                        handler_args=None, client_max_size=1024**2, \
                        loop=None, debug=...)
 
@@ -1240,10 +1261,6 @@ duplicated like one using :meth:`Application.copy`.
    :param logger: :class:`logging.Logger` instance for storing application logs.
 
                   By default the value is ``logging.getLogger("aiohttp.web")``
-
-   :param router: :class:`aiohttp.abc.AbstractRouter` instance, the system
-                  creates :class:`UrlDispatcher` by default if
-                  *router* is ``None``.
 
    :param middlewares: :class:`list` of middleware factories, see
                        :ref:`aiohttp-web-middlewares` for details.
@@ -1265,6 +1282,10 @@ duplicated like one using :meth:`Application.copy`.
 
    :param debug: Switches debug mode.
 
+      .. deprecated:: 3.5
+
+         Use asyncio :ref:`asyncio-debug-mode` instead.
+
    .. attribute:: router
 
       Read-only property that returns *router instance*.
@@ -1277,10 +1298,15 @@ duplicated like one using :meth:`Application.copy`.
 
       :ref:`event loop<asyncio-event-loop>` used for processing HTTP requests.
 
+      .. deprecated:: 3.5
 
    .. attribute:: debug
 
       Boolean value indicating whether the debug mode is turned on or off.
+
+      .. deprecated:: 3.5
+
+         Use asyncio :ref:`asyncio-debug-mode` instead.
 
    .. attribute:: on_response_prepare
 
@@ -1371,6 +1397,21 @@ duplicated like one using :meth:`Application.copy`.
 
       :returns: a :class:`PrefixedSubAppResource` instance.
 
+   .. method:: add_domain(domain, subapp)
+
+      Register nested sub-application that serves
+      the domain name or domain name mask.
+
+      In resolving process if request.headers['host']
+      matches the pattern *domain* then
+      further resolving is passed to *subapp*.
+
+      :param str domain: domain or mask of domain for the resource.
+
+      :param Application subapp: nested application.
+
+      :returns: a :class:`MatchedSubAppResource` instance.
+
    .. method:: add_routes(routes_table)
 
       Register route definitions from *routes_table*.
@@ -1386,54 +1427,56 @@ duplicated like one using :meth:`Application.copy`.
 
    .. method:: make_handler(loop=None, **kwargs)
 
-    Creates HTTP protocol factory for handling requests.
+      Creates HTTP protocol factory for handling requests.
 
-    :param loop: :ref:`event loop<asyncio-event-loop>` used
-                 for processing HTTP requests.
+      :param loop: :ref:`event loop<asyncio-event-loop>` used
+        for processing HTTP requests.
 
-                 If param is ``None`` :func:`asyncio.get_event_loop`
-                 used for getting default event loop.
+        If param is ``None`` :func:`asyncio.get_event_loop`
+        used for getting default event loop.
 
-       .. deprecated:: 2.0
+        .. deprecated:: 2.0
 
-    :param bool tcp_keepalive: Enable TCP Keep-Alive. Default: ``True``.
-    :param int keepalive_timeout: Number of seconds before closing Keep-Alive
-      connection. Default: ``75`` seconds (NGINX's default value).
-    :param logger: Custom logger object. Default:
-      :data:`aiohttp.log.server_logger`.
-    :param access_log: Custom logging object. Default:
-      :data:`aiohttp.log.access_logger`.
-    :param access_log_class: class for `access_logger`. Default:
-      :data:`aiohttp.helpers.AccessLogger`.
-      Must to be a subclass of :class:`aiohttp.abc.AbstractAccessLogger`.
-    :param str access_log_format: Access log format string. Default:
-      :attr:`helpers.AccessLogger.LOG_FORMAT`.
-    :param int max_line_size: Optional maximum header line size. Default:
-      ``8190``.
-    :param int max_headers: Optional maximum header size. Default: ``32768``.
-    :param int max_field_size: Optional maximum header field size. Default:
-      ``8190``.
+      :param bool tcp_keepalive: Enable TCP Keep-Alive. Default: ``True``.
+      :param int keepalive_timeout: Number of seconds before closing Keep-Alive
+        connection. Default: ``75`` seconds (NGINX's default value).
+      :param logger: Custom logger object. Default:
+        :data:`aiohttp.log.server_logger`.
+      :param access_log: Custom logging object. Default:
+        :data:`aiohttp.log.access_logger`.
+      :param access_log_class: Class for `access_logger`. Default:
+        :data:`aiohttp.helpers.AccessLogger`.
+        Must to be a subclass of :class:`aiohttp.abc.AbstractAccessLogger`.
+      :param str access_log_format: Access log format string. Default:
+        :attr:`helpers.AccessLogger.LOG_FORMAT`.
+      :param int max_line_size: Optional maximum header line size. Default:
+        ``8190``.
+      :param int max_headers: Optional maximum header size. Default: ``32768``.
+      :param int max_field_size: Optional maximum header field size. Default:
+        ``8190``.
 
-    :param float lingering_time: maximum time during which the server
-       reads and ignore additional data coming from the client when
-       lingering close is on.  Use ``0`` for disabling lingering on
-       server channel closing.
+      :param float lingering_time: Maximum time during which the server
+        reads and ignores additional data coming from the client when
+        lingering close is on.  Use ``0`` to disable lingering on
+        server channel closing.
 
-    :param float lingering_timeout: maximum waiting time for more
-        client data to arrive when lingering close is in effect
+      You should pass result of the method as *protocol_factory* to
+      :meth:`~asyncio.AbstractEventLoop.create_server`, e.g.::
 
-    You should pass result of the method as *protocol_factory* to
-    :meth:`~asyncio.AbstractEventLoop.create_server`, e.g.::
+         loop = asyncio.get_event_loop()
 
-       loop = asyncio.get_event_loop()
+         app = Application()
 
-       app = Application()
+         # setup route table
+         # app.router.add_route(...)
 
-       # setup route table
-       # app.router.add_route(...)
+         await loop.create_server(app.make_handler(),
+                                  '0.0.0.0', 8080)
 
-       await loop.create_server(app.make_handler(),
-                                '0.0.0.0', 8080)
+      .. deprecated:: 3.2
+
+         The method is deprecated and will be removed in future
+         aiohttp versions.  Please use :ref:`aiohttp-web-app-runners` instead.
 
    .. comethod:: startup()
 
@@ -1482,12 +1525,12 @@ Server
 A protocol factory compatible with
 :meth:`~asyncio.AbstreactEventLoop.create_server`.
 
-      .. class:: Server
+.. class:: Server
 
    The class is responsible for creating HTTP protocol
    objects that can handle HTTP connections.
 
-   .. attribute:: Server.connections
+   .. attribute:: connections
 
       List of all currently opened connections.
 
@@ -1823,6 +1866,13 @@ Resource classes hierarchy::
 
       Read-only *name* of resource or ``None``.
 
+   .. attribute:: canonical
+
+      Read-only *canonical path* associate with the resource. For example
+      ``/path/to`` or ``/path/{to}``
+
+      .. versionadded:: 3.3
+
    .. comethod:: resolve(request)
 
       Resolve resource by finding appropriate :term:`web-handler` for
@@ -1886,6 +1936,12 @@ Resource classes hierarchy::
    The class corresponds to resources with plain-text matching,
    ``'/path/to'`` for example.
 
+   .. attribute:: canonical
+
+      Read-only *canonical path* associate with the resource. Returns the path
+      used to create the PlainResource. For example ``/path/to``
+
+      .. versionadded:: 3.3
 
    .. method:: url_for()
 
@@ -1900,6 +1956,13 @@ Resource classes hierarchy::
    :ref:`variable <aiohttp-web-variable-handler>` matching,
    e.g. ``'/path/{to}/{param}'`` etc.
 
+   .. attribute:: canonical
+
+      Read-only *canonical path* associate with the resource. Returns the
+      formatter obtained from the path used to create the DynamicResource.
+      For example, from a path ``/get/{num:^\d+}``, it returns ``/get/{num}``
+
+      .. versionadded:: 3.3
 
    .. method:: url_for(**params)
 
@@ -1918,6 +1981,13 @@ Resource classes hierarchy::
    The class corresponds to resources for :ref:`static file serving
    <aiohttp-web-static-file-handling>`.
 
+   .. attribute:: canonical
+
+      Read-only *canonical path* associate with the resource. Returns the prefix
+      used to create the StaticResource. For example ``/prefix``
+
+      .. versionadded:: 3.3
+
    .. method:: url_for(filename, append_version=None)
 
       Returns a :class:`~yarl.URL` for file path under resource prefix.
@@ -1933,7 +2003,7 @@ Resource classes hierarchy::
                                   (hash) to the url query string for
                                   cache boosting
 
-         By default has value from an constructor (``False`` by default)
+         By default has value from a constructor (``False`` by default)
          When set to ``True`` - ``v=FILE_HASH`` query string param will be added
          When set to ``False`` has no impact
 
@@ -1944,6 +2014,14 @@ Resource classes hierarchy::
 
    A resource for serving nested applications. The class instance is
    returned by :class:`~aiohttp.web.Application.add_subapp` call.
+
+   .. attribute:: canonical
+
+      Read-only *canonical path* associate with the resource. Returns the
+      prefix used to create the PrefixedSubAppResource.
+      For example ``/prefix``
+
+      .. versionadded:: 3.3
 
    .. method:: url_for(**kwargs)
 
@@ -2392,13 +2470,49 @@ application on specific TCP or Unix socket, e.g.::
 
 .. versionadded:: 3.0
 
-   :class:`AppRunner` and :class:`TCPSite` / :class:`UnixSite` /
-   :class:`SockSite` are added in aiohttp 3.0
+   :class:`AppRunner` / :class:`ServerRunner` and :class:`TCPSite` /
+   :class:`UnixSite` / :class:`SockSite` are added in aiohttp 3.0
+
+
+.. class:: BaseRunner
+
+   A base class for runners. Use :class:`AppRunner` for serving
+   :class:`Application`, :class:`ServerRunner` for low-level
+   :class:`Server`.
+
+   .. attribute:: server
+
+      Low-level web :class:`Server` for handling HTTP requests,
+      read-only attribute.
+
+   .. attribute:: addresses
+
+      A  :class:`list` of served sockets addresses.
+
+      See :meth:`socket.getsockname` for items type.
+
+      .. versionadded:: 3.3
+
+   .. attribute:: sites
+
+      A read-only :class:`set` of served sites (:class:`TCPSite` /
+      :class:`UnixSite` / :class:`SockSite` instances).
+
+   .. comethod:: setup()
+
+      Initialize the server. Should be called before adding sites.
+
+   .. comethod:: cleanup()
+
+      Stop handling all registered sites and cleanup used resources.
+
 
 .. class:: AppRunner(app, *, handle_signals=False, **kwargs)
 
    A runner for :class:`Application`. Used with conjunction with sites
    to serve on specific port.
+
+   Inherited from :class:`BaseRunner`.
 
    :param Application app: web application instance to serve.
 
@@ -2408,22 +2522,12 @@ application on specific TCP or Unix socket, e.g.::
                                default).
 
    :param kwargs: named parameters to pass into
-                    :meth:`Application.make_handler`.
+                  web protocol.
 
    .. attribute:: app
 
       Read-only attribute for accessing to :class:`Application` served
       instance.
-
-   .. attribute:: server
-
-      Low-level web :class:`Server` for handling HTTP requests,
-      read-only attribute.
-
-   .. attribute:: sites
-
-      A read-only :class:`set` of served sites (:class:`TCPSite` /
-      :class:`UnixSite` / :class:`SockSite` instances).
 
    .. comethod:: setup()
 
@@ -2438,6 +2542,28 @@ application on specific TCP or Unix socket, e.g.::
       :attr:`Application.on_shutdown` and
       :attr:`Application.on_cleanup` signals are called internally.
 
+
+.. class:: ServerRunner(web_server, *, handle_signals=False, **kwargs)
+
+   A runner for low-level :class:`Server`. Used with conjunction with sites
+   to serve on specific port.
+
+   Inherited from :class:`BaseRunner`.
+
+   :param Server web_server: low-level web server instance to serve.
+
+   :param bool handle_signals: add signal handlers for
+                               :data:`signal.SIGINT` and
+                               :data:`signal.SIGTERM` (``False`` by
+                               default).
+
+   :param kwargs: named parameters to pass into
+                  web protocol.
+
+   .. seealso::
+
+      :ref:`aiohttp-web-lowlevel` demonstrates low-level server usage
+
 .. class:: BaseSite
 
    An abstract class for handled sites.
@@ -2445,7 +2571,7 @@ application on specific TCP or Unix socket, e.g.::
    .. attribute:: name
 
       An identifier for site, read-only :class:`str` property. Could
-      be an handled URL or UNIX socket path.
+      be a handled URL or UNIX socket path.
 
    .. comethod:: start()
 
@@ -2458,7 +2584,7 @@ application on specific TCP or Unix socket, e.g.::
 
 .. class:: TCPSite(runner, host=None, port=None, *, \
                    shutdown_timeout=60.0, ssl_context=None, \
-                   backlog=128, reuse_address=None,
+                   backlog=128, reuse_address=None, \
                    reuse_port=None)
 
    Serve a runner on TCP socket.
@@ -2699,27 +2825,41 @@ Normalize path middleware
 ^^^^^^^^^^^^^^^^^^^^^^^^^
 
 .. function:: normalize_path_middleware(*, \
-                                        append_slash=True, merge_slashes=True)
+                                        append_slash=True, \
+                                        remove_slash=False, \
+                                        merge_slashes=True, \
+                                        redirect_class=HTTPMovedPermanently)
 
-  Middleware factory which produces a middleware that normalizes
-  the path of a request. By normalizing it means:
+   Middleware factory which produces a middleware that normalizes
+   the path of a request. By normalizing it means:
 
-      - Add a trailing slash to the path.
-      - Double slashes are replaced by one.
+     - Add or remove a trailing slash to the path.
+     - Double slashes are replaced by one.
 
-  The middleware returns as soon as it finds a path that resolves
-  correctly. The order if all enabled is:
+   The middleware returns as soon as it finds a path that resolves
+   correctly. The order if both merge and append/remove are enabled is:
 
-    1. *merge_slashes*
-    2. *append_slash*
-    3. both *merge_slashes* and *append_slash*
+     1. *merge_slashes*
+     2. *append_slash* or *remove_slash*
+     3. both *merge_slashes* and *append_slash* or *remove_slash*
 
-  If the path resolves with at least one of those conditions, it will
-  redirect to the new path.
+   If the path resolves with at least one of those conditions, it will
+   redirect to the new path.
 
-  If *append_slash* is ``True`` append slash when needed. If a resource is
-  defined with trailing slash and the request comes without it, it will
-  append it automatically.
+   Only one of *append_slash* and *remove_slash* can be enabled. If both are
+   ``True`` the factory will raise an ``AssertionError``
 
-  If *merge_slashes* is ``True``, merge multiple consecutive slashes in the
-  path into one.
+   If *append_slash* is ``True`` the middleware will append a slash when
+   needed. If a resource is defined with trailing slash and the request
+   comes without it, it will append it automatically.
+
+   If *remove_slash* is ``True``, *append_slash* must be ``False``. When enabled
+   the middleware will remove trailing slashes and redirect if the resource is
+   defined.
+
+   If *merge_slashes* is ``True``, merge multiple consecutive slashes in the
+   path into one.
+
+   .. versionadded:: 3.4
+
+      Support for *remove_slash*

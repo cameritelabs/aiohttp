@@ -10,9 +10,14 @@ Async http client/server framework
 |
 
 .. image:: https://travis-ci.com/aio-libs/aiohttp.svg?branch=master
-   :target:  https://travis-ci.com/aio-libs/aiohttp
+   :target: https://travis-ci.com/aio-libs/aiohttp
    :align: right
    :alt: Travis status for master branch
+
+.. image:: https://ci.appveyor.com/api/projects/status/tnddy9k6pphl8w7k/branch/master?svg=true
+   :target: https://ci.appveyor.com/project/aio-libs/aiohttp
+   :align: right
+   :alt: AppVeyor status for master branch
 
 .. image:: https://codecov.io/gh/aio-libs/aiohttp/branch/master/graph/badge.svg
    :target: https://codecov.io/gh/aio-libs/aiohttp
@@ -23,7 +28,7 @@ Async http client/server framework
    :alt: Latest PyPI package version
 
 .. image:: https://readthedocs.org/projects/aiohttp/badge/?version=latest
-   :target: http://docs.aiohttp.org/
+   :target: https://docs.aiohttp.org/
    :alt: Latest Read The Docs
 
 .. image:: https://badges.gitter.im/Join%20Chat.svg
@@ -34,9 +39,9 @@ Key Features
 ============
 
 - Supports both client and server side of HTTP protocol.
-- Supports both client and server Web-Sockets out-of-the-box without the
+- Supports both client and server Web-Sockets out-of-the-box and avoids
   Callback Hell.
-- Web-server has middlewares and pluggable routing.
+- Provides Web-server with middlewares and pluggable routing.
 
 
 Getting started
@@ -45,7 +50,7 @@ Getting started
 Client
 ------
 
-To retrieve something from the web:
+To get something from the web:
 
 .. code-block:: python
 
@@ -69,10 +74,11 @@ To retrieve something from the web:
 Server
 ------
 
-This is simple usage example:
+An example using a simple server:
 
 .. code-block:: python
 
+    # examples/server_simple.py
     from aiohttp import web
 
     async def handle(request):
@@ -172,19 +178,19 @@ Keepsafe
 ========
 
 The aiohttp community would like to thank Keepsafe
-(https://www.getkeepsafe.com) for it's support in the early days of
+(https://www.getkeepsafe.com) for its support in the early days of
 the project.
 
 
 Source code
 ===========
 
-The latest developer version is available in a github repository:
+The latest developer version is available in a GitHub repository:
 https://github.com/aio-libs/aiohttp
 
 Benchmarks
 ==========
 
-If you are interested in by efficiency, AsyncIO community maintains a
+If you are interested in efficiency, the AsyncIO community maintains a
 list of benchmarks on the official wiki:
 https://github.com/python/asyncio/wiki/Benchmarks

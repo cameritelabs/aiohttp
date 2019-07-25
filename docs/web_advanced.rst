@@ -393,6 +393,82 @@ and safe to use as the key.
 Otherwise, something based on your company name/url would be satisfactory (i.e.
 ``org.company.app``).
 
+
+.. _aiohttp-web-contextvars:
+
+
+ContextVars support
+-------------------
+
+Starting from Python 3.7 asyncio has :mod:`Context Variables <contextvars>` as a
+context-local storage (a generalization of thread-local concept that works with asyncio
+tasks also).
+
+
+*aiohttp* server supports it in the following way:
+
+* A server inherits the current task's context used when creating it.
+  :func:`aiohttp.web.run_app()` runs a task for handling all underlying jobs running
+  the app, but alternatively :ref:`aiohttp-web-app-runners` can be used.
+
+* Application initialization / finalization events (:attr:`Application.cleanup_ctx`,
+  :attr:`Application.on_startup` and :attr:`Application.on_shutdown`,
+  :attr:`Application.on_cleanup`) are executed inside the same context.
+
+  E.g. all context modifications made on application startup a visible on teardown.
+
+* On every request handling *aiohttp* creates a context copy. :term:`web-handler` has
+  all variables installed on initialization stage. But the context modification made by
+  a handler or middleware is invisible to another HTTP request handling call.
+
+An example of context vars usage::
+
+    from contextvars import ContextVar
+
+    from aiohttp import web
+
+    VAR = ContextVar('VAR', default='default')
+
+
+    async def coro():
+        return VAR.get()
+
+
+    async def handler(request):
+        var = VAR.get()
+        VAR.set('handler')
+        ret = await coro()
+        return web.Response(text='\n'.join([var,
+                                            ret]))
+
+
+    async def on_startup(app):
+        print('on_startup', VAR.get())
+        VAR.set('on_startup')
+
+
+    async def on_cleanup(app):
+        print('on_cleanup', VAR.get())
+        VAR.set('on_cleanup')
+
+
+    async def init():
+        print('init', VAR.get())
+        VAR.set('init')
+        app = web.Application()
+        app.router.add_get('/', handler)
+
+        app.on_startup.append(on_startup)
+        app.on_cleanup.append(on_cleanup)
+        return app
+
+
+    web.run_app(init())
+    print('done', VAR.get())
+
+.. versionadded:: 3.5
+
+
 .. _aiohttp-web-middlewares:
 
 Middlewares
@@ -575,17 +651,8 @@ engine::
 Signal handlers should not return a value but may modify incoming mutable
 parameters.
 
-Signal handlers will be run sequentially, in order they were added. If handler
-is asynchronous, it will be awaited before calling next one.
-
-.. warning::
-
-   Signals API has provisional status, meaning it may be changed in future
-   releases.
-
-   Signal subscription and sending will most likely be the same, but signal
-   object creation is subject to change. As long as you are not creating new
-   signals, but simply reusing existing ones, you will not be affected.
+Signal handlers will be run sequentially, in order they were
+added. All handlers must be asynchronous since *aiohttp* 3.0.
 
 .. _aiohttp-web-cleanup-ctx:
 
@@ -772,7 +839,7 @@ Application runners
 :func:`run_app` provides a simple *blocking* API for running an
 :class:`Application`.
 
-For starting the application *asynchronously* on serving on multiple
+For starting the application *asynchronously* or serving on multiple
 HOST/PORT :class:`AppRunner` exists.
 
 The simple startup code for serving HTTP site on ``'localhost'``, port
@@ -835,7 +902,7 @@ Signal handler may look like::
     from aiohttp import WSCloseCode
 
     async def on_shutdown(app):
-        for ws in app['websockets']:
+        for ws in set(app['websockets']):
             await ws.close(code=WSCloseCode.GOING_AWAY,
                            message='Server shutdown')
 
@@ -875,7 +942,7 @@ signal handlers as shown in the example below::
 
   async def listen_to_redis(app):
       try:
-          sub = await aioredis.create_redis(('localhost', 6379), loop=app.loop)
+          sub = await aioredis.create_redis(('localhost', 6379))
           ch, *_ = await sub.subscribe('news')
           async for msg in ch.iter(encoding='utf-8'):
               # Forward message to all connected websockets:
@@ -889,7 +956,7 @@ signal handlers as shown in the example below::
 
 
   async def start_background_tasks(app):
-      app['redis_listener'] = app.loop.create_task(listen_to_redis(app))
+      app['redis_listener'] = asyncio.create_task(listen_to_redis(app))
 
 
   async def cleanup_background_tasks(app):

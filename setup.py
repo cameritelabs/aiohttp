@@ -12,6 +12,7 @@ from setuptools import Extension, setup
 if sys.version_info < (3, 5, 3):
     raise RuntimeError("aiohttp 3.x requires Python 3.5.3+")
 
+here = pathlib.Path(__file__).parent
 
 try:
     from Cython.Build import cythonize
@@ -19,13 +20,28 @@ try:
 except ImportError:
     USE_CYTHON = False
 
+if (here / '.git').exists() and not USE_CYTHON:
+    print("Install cython when building from git clone", file=sys.stderr)
+    print("Hint:", file=sys.stderr)
+    print("  pip install cython", file=sys.stderr)
+    sys.exit(1)
+
+
+if (here / '.git').exists() and not (here / 'vendor/http-parser/README.md'):
+    print("Install submodules when building from git clone", file=sys.stderr)
+    print("Hint:", file=sys.stderr)
+    print("  git submodule update --init", file=sys.stderr)
+    sys.exit(2)
+
+
 ext = '.pyx' if USE_CYTHON else '.c'
 
 
 extensions = [Extension('aiohttp._websocket', ['aiohttp/_websocket' + ext]),
               Extension('aiohttp._http_parser',
                         ['aiohttp/_http_parser' + ext,
-                         'vendor/http-parser/http_parser.c'],
+                         'vendor/http-parser/http_parser.c',
+                         'aiohttp/_find_header.c'],
                         define_macros=[('HTTP_PARSER_STRICT', 0)],
                         ),
               Extension('aiohttp._frozenlist',
@@ -61,7 +77,6 @@ class ve_build_ext(build_ext):
             raise BuildFailed()
 
 
-here = pathlib.Path(__file__).parent
 
 txt = (here / 'aiohttp' / '__init__.py').read_text('utf-8')
 try:
@@ -70,14 +85,15 @@ try:
 except IndexError:
     raise RuntimeError('Unable to determine version.')
 
-
-install_requires = ['attrs>=17.3.0', 'chardet>=2.0,<4.0',
-                    'multidict>=4.0,<5.0',
-                    'async_timeout>=3.0,<4.0',
-                    'yarl>=1.0,<2.0']
-
-if sys.version_info < (3, 7):
-    install_requires.append('idna-ssl>=1.0')
+install_requires = [
+    'attrs>=17.3.0',
+    'chardet>=2.0,<4.0',
+    'multidict>=4.0,<5.0',
+    'async_timeout>=3.0,<4.0',
+    'yarl>=1.0,<2.0',
+    'idna-ssl>=1.0; python_version<"3.7"',
+    'typing_extensions>=3.6.5; python_version<"3.7"',
+]
 
 
 def read(f):
@@ -87,8 +103,11 @@ def read(f):
 NEEDS_PYTEST = {'pytest', 'test'}.intersection(sys.argv)
 pytest_runner = ['pytest-runner'] if NEEDS_PYTEST else []
 
-tests_require = ['pytest', 'gunicorn',
-                 'pytest-timeout', 'async-generator']
+tests_require = [
+    'pytest', 'gunicorn',
+    'pytest-timeout', 'async-generator',
+    'pytest-xdist',
+]
 
 
 args = dict(
@@ -119,7 +138,7 @@ args = dict(
     url='https://github.com/aio-libs/aiohttp',
     project_urls={
         'Chat: Gitter': 'https://gitter.im/aio-libs/Lobby',
-        'CI: AppVeyor': 'https://ci.appveyor.com/project/asvetlov/aiohttp',  # FIXME: move under aio-libs/* slug
+        'CI: AppVeyor': 'https://ci.appveyor.com/project/aio-libs/aiohttp',
         'CI: Circle': 'https://circleci.com/gh/aio-libs/aiohttp',
         'CI: Shippable': 'https://app.shippable.com/github/aio-libs/aiohttp',
         'CI: Travis': 'https://travis-ci.com/aio-libs/aiohttp',
@@ -132,6 +151,13 @@ args = dict(
     packages=['aiohttp'],
     python_requires='>=3.5.3',
     install_requires=install_requires,
+    extras_require={
+        'speedups': [
+            'aiodns',
+            'brotlipy',
+            'cchardet',
+        ],
+    },
     tests_require=tests_require,
     setup_requires=pytest_runner,
     include_package_data=True,

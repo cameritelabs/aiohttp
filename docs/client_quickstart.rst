@@ -61,6 +61,15 @@ Other HTTP methods are available as well::
    A session contains a connection pool inside. Connection reusage and
    keep-alives (both are on by default) may speed up total performance.
 
+A session context manager usage is not mandatory
+but ``await session.close()`` method
+should be called in this case, e.g.::
+
+    session = aiohttp.ClientSession()
+    async with session.get('...'):
+        # ...
+    await session.close()
+
 
 Passing Parameters In URLs
 ==========================
@@ -91,7 +100,7 @@ that case you can specify multiple values for each key::
     params = [('key', 'value1'), ('key', 'value2')]
     async with session.get('http://httpbin.org/get',
                            params=params) as r:
-        expect == 'http://httpbin.org/get?key=value2&key=value1'
+        expect = 'http://httpbin.org/get?key=value2&key=value1'
         assert str(r.url) == expect
 
 You can also pass :class:`str` content as param, but beware -- content
@@ -108,7 +117,7 @@ is not encoded by library. Note that ``+`` is not encoded::
    Canonization encodes *host* part by :term:`IDNA` codec and applies
    :term:`requoting` to *path* and *query* parts.
 
-   For example ``URL('http://example.com/путь%30?a=%31')`` is converted to
+   For example ``URL('http://example.com/путь/%30?a=%31')`` is converted to
    ``URL('http://example.com/%D0%BF%D1%83%D1%82%D1%8C/0?a=1')``.
 
    Sometimes canonization is not desirable if server accepts exact
@@ -126,7 +135,7 @@ is not encoded by library. Note that ``+`` is not encoded::
 Response Content and Status Code
 ================================
 
-We can read the content of the server's response and it's status
+We can read the content of the server's response and its status
 code. Consider the GitHub time-line again::
 
     async with session.get('https://api.github.com/events') as resp:
@@ -169,7 +178,7 @@ Any of session's request methods like :func:`request`,
 `json` parameter::
 
   async with aiohttp.ClientSession() as session:
-      async with session.post(url, json={'test': 'object'})
+      await session.post(url, json={'test': 'object'})
 
 
 By default session uses python's standard :mod:`json` module for
@@ -275,7 +284,7 @@ If you want to send JSON data::
 
 To send text with appropriate content-type just use ``text`` attribute ::
 
-    async with session.post(url, text='Тест') as resp:
+    async with session.post(url, data='Тест') as resp:
         ...
 
 POST a Multipart-Encoded File
@@ -347,12 +356,6 @@ can chain get and post requests together::
    Python 3.5 has no native support for asynchronous generators, use
    ``async_generator`` library as workaround.
 
-.. deprecated:: 3.1
-
-   ``aiohttp`` still supports ``aiohttp.streamer`` decorator but this
-   approach is deprecated in favor of *asynchronous generators* as
-   shown above.
-
 
 .. _aiohttp-client-websockets:
 
@@ -386,6 +389,7 @@ multiple writer tasks which can only send data asynchronously (by
 ``await ws.send_str('data')`` for example).
 
 
+.. _aiohttp-client-timeouts:
 
 Timeouts
 ========
@@ -415,15 +419,25 @@ Supported :class:`ClientTimeout` fields are:
 
    ``connect``
 
-      The maximum time for connection establishment.
+      The time
+      consists connection establishment for a new connection or
+      waiting for a free connection from a pool if pool connection
+      limits are exceeded.
+
+   ``sock_connect``
+
+      A timeout for connecting to a peer for a new connection, not
+      given from a pool.
 
    ``sock_read``
 
       The maximum allowed timeout for period between reading a new
       data portion from a peer.
 
-All fields a floats, ``None`` or ``0`` disables a particular timeout check.
+All fields are floats, ``None`` or ``0`` disables a particular timeout check, see the
+:class:`ClientTimeout` reference for defaults and additional details.
 
 Thus the default timeout is::
 
-   aiohttp.ClientTimeout(total=5*60, connect=None, sock_read=None)
+   aiohttp.ClientTimeout(total=5*60, connect=None,
+                         sock_connect=None, sock_read=None)
