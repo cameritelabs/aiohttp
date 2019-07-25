@@ -1,5 +1,6 @@
 __version__ = '3.5.9'
 
+import logging
 from typing import Tuple  # noqa
 
 from . import hdrs
@@ -205,6 +206,9 @@ __all__ = (
     'TraceResponseChunkReceivedParams',
 )  # type: Tuple[str, ...]
 
+logger.warning("This lib was created to solve a issue,\
+     however the original lib wasen't publish a stable release with this fix,\
+         perhaps will need to be change on future ")
 try:
     from .worker import GunicornWebWorker, GunicornUVLoopWebWorker  # noqa
     __all__ += ('GunicornWebWorker', 'GunicornUVLoopWebWorker')
