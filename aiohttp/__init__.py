@@ -211,9 +211,7 @@ logging.basicConfig(
     format="PID(%(process)d) - %(asctime)s - %(name)s - %(levelname)s - %(message)s",
 )
 logger = logging.getLogger(__name__)
-logger.warning("This lib was created to solve a issue,\
-     however the original lib wasen't publish a stable release with this fix,\
-         perhaps will need to be change on future ")
+logger.warning("This lib was created to solve a issue, however the original lib wasn't publish a stable release with this fix, perhaps will need to be change on future ")
 try:
     from .worker import GunicornWebWorker, GunicornUVLoopWebWorker  # noqa
     __all__ += ('GunicornWebWorker', 'GunicornUVLoopWebWorker')
